@@ -1,9 +1,9 @@
 #include <SPI.h>
 #include <UNIT_PN532.h>
-#include <Servo.h>
+#include <ESP32_Servo.h>
 /* numero de pines*/
-#define ChipNoAuth 80
-#define ChipAuth 55
+#define ChipNoAuth 100
+#define ChipAuth 10
 #define ChipPin  22
 #define Lock 21
 #define Unlock 0
@@ -45,6 +45,8 @@ TinyGsmClientSecure gsm_client_secure_modem(modem);
 HttpClient http_client = HttpClient(gsm_client_secure_modem, FIREBASE_HOST, SSL_PORT);
 unsigned long previousMillis = 0;
 long interval = 10000;
+float lat;
+float lon;
 /**********************************************************************************************/
 UNIT_PN532  nfc(PN532_SS);
 Servo Chip;
@@ -58,9 +60,10 @@ bool RunStatus = false;
 bool StartStatus = false;
 bool StatusOpen = false;
 bool prueba = false;
+bool StatusOfGPS= false;
 /*Timer cada un minuto para poder checar la base de datos*/
 hw_timer_t * timer = NULL;
-#define OneMin 60000000
+#define OneMin 20000000
 void IRAM_ATTR FirabseCheckGPS(void);
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile int interruptCounter;
@@ -105,6 +108,9 @@ void loop()
   }
   if (interrupcionBoton == 1) {
     ChecarBoton();
+  }
+  if (modem.getGPS(&lat, &lon) && StatusOfGPS) {
+    SendGPS();
   }
 }
 
@@ -183,6 +189,7 @@ void NoAutorizado() {
 
 void OpenDoors() {
   Chip.write(ChipAuth);
+  interrupcionBoton = 0;
   delay(650);
   if (!RunStatus) {
     digitalWrite(Acc1 , LOW);
@@ -199,6 +206,7 @@ void OpenDoors() {
 
 void CloseDoors() {
   Chip.write(ChipNoAuth);
+  interrupcionBoton = 0;
   digitalWrite(Lock, LOW);
   delay(200);
   digitalWrite(Lock, HIGH);
@@ -210,7 +218,6 @@ void CloseDoors() {
   RunStatus = false;
   StartStatus = false;
   autorizado = false;
-  gpsPost(); 
 }
 
 void IRAM_ATTR ChecarBotonInterrupcion() {
@@ -226,12 +233,16 @@ void ChecarBoton() {
   if (autorizado ) {
     if (!StartStatus) {
       if (RunStatus) {
+
         digitalWrite(Acc1, HIGH);
         digitalWrite(Starter, LOW);
-        delay(400);
+        delay(500);
         digitalWrite(Starter, HIGH);
         digitalWrite(Acc1, LOW);
         StartStatus = true;
+        delay(1500);
+        gpsPost();
+
       } else {
         if (StatusOpen) {
           digitalWrite(Run, LOW);
@@ -243,9 +254,7 @@ void ChecarBoton() {
       StartStatus = false;
       RunStatus = false;
       digitalWrite(Run, HIGH);
-      digitalWrite(Acc2, HIGH);
-      prueba = false;
-                                                                                                    //////////////////////////////////////////////////
+      digitalWrite(Acc2, HIGH); //////////////////////////////////////////////////
     }
   }
 }
@@ -260,7 +269,7 @@ void TurnOnCar() {
   delay(1500);
   digitalWrite(Acc1, HIGH);
   digitalWrite(Starter, LOW);
-  delay(400);
+  delay(600);
   digitalWrite(Starter, HIGH);
   digitalWrite(Acc1, LOW);
   StartStatus = true;
@@ -332,8 +341,7 @@ void NFC() {
 
 void enableGPS(void) {  // Se habilita el GPS con el Comando AT+SGPIO=0,4,1,1   El ultimo 1 nos indica que se prendera
   modem.sendAT("+SGPIO=0,4,1,1");
-  if (modem.waitResponse(10000L) != 1)
-    DBG(" SGPIO=0,4,1,1 false ");
+  StatusOfGPS=true;
   modem.enableGPS();
 }
 
@@ -441,6 +449,7 @@ void setConnection() {    // Se crea la conexion a internet con el SIM7000
   url = "";
   url += PathPrimary + ".json";
   url += "?auth=" + FIREBASE_AUTH;
+  Serial.println(url);
   ReadFromFirebase();
 }
 
@@ -458,6 +467,7 @@ void ReadFromFirebase() {
   String IgnicionStatusOff = "0";
   http_client.get(url);
   response = http_client.responseBody();
+  Serial.println(response);
   if (response.length() == 0) {
     return;
   }
@@ -509,26 +519,25 @@ void ReadFromFirebase() {
 }
 
 void gpsPost() {
-  enableGPS();
-  float lat;
-  float lon;
   timerAlarmDisable(timer);  // deshabilitamos la interrupcion para leer firebase ya que se puede llegar a tardar mas de un minuto esta funcion
-  while (1) {
-    if (modem.getGPS(&lat, &lon)) {
+  enableGPS();
+}
+
+void SendGPS(){
       SerialAT.write(Serial.read());
       Serial.println("Se obtuvo las cordenadas");
-      break;
-    }
-  }
-  disableGPS();
-  String gpsData = "";
-  gpsData = "{";
-  gpsData += "\"latitud\":" + String(lat, 10) + ",";
-  gpsData += "\"longitud\":" + String(lon, 10) + ",";
-  gpsData += "\"GPS\":" + String(0) + "";
-  gpsData += "}";
-  //PATCH   Update some of the keys for a defined path without replacing all of the data.
-  PostToFirebase("PATCH", gpsData);
-  timerWrite(timer, 0);
-  timerAlarmEnable(timer);
+      //disableGPS();
+      String gpsData = "";
+      gpsData = "{";
+      gpsData += "\"latitud\":" + String(lat, 10) + ",";
+      gpsData += "\"longitud\":" + String(lon, 10) + ",";
+      gpsData += "\"GPS\":" + String(0) + "";
+      gpsData += "}";
+      //PATCH   Update some of the keys for a defined path without replacing all of the data.
+      PostToFirebase("PATCH", gpsData);
+      timerWrite(timer, 0);
+      timerAlarmEnable(timer);
+      StatusOfGPS=false;
+      lat = NULL;
+      lon = NULL;
 }
