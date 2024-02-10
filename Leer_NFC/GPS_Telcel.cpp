@@ -39,13 +39,17 @@ void GPS_Telcel::doSomething() {
 
 
 void  GPS_Telcel::gpsPost() {
-  modem.sendAT("+SGPIO=0,4,1,1");
-  modem.enableGPS();
-  StatusOfGPS = true ;
+  if(!StatusOfGPS){
+    Serial.println("Se Pidio el GPS");
+    //modem.sendAT("+SGPIO=0,4,1,1");
+    StatusOfGPS = true ;
+  }
 }
 
 void GPS_Telcel::CheckState(){
   if(modem.getGPS(&lat, &lon) && StatusOfGPS){
+    Serial.println("Latitud : ");
+    Serial.println(lat);
     SendGPS(lat, lon);
     lat= NULL;
     lon = NULL;
@@ -65,14 +69,15 @@ bool GPS_Telcel::SendGPS(float lat1, float lon1){
       //PATCH   Update some of the keys for a defined path without replacing all of the data.
       PostToFirebase("PATCH", gpsData);
       StatusOfGPS = false;
+      gpsPost();
 }
 
 
 
 void GPS_Telcel::setConnection() {    // Se crea la conexion a internet con el SIM7000
   /*Inicializar sim7000*/
-  SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
   modemPowerOn();
+  SerialAT.begin(UART_BAUD, SERIAL_8N1, PIN_RX, PIN_TX);
   modem.init();
   modem.sendAT("+SGPIO=0,4,1,0");
   modem.sendAT("+CFUN=0 ");
@@ -151,29 +156,38 @@ void GPS_Telcel::setConnection() {    // Se crea la conexion a internet con el S
     String r = SerialAT.readString();
     Serial.println(r);
   }
+  modem.sendAT("+SGPIO=0,4,1,1");
+  if (modem.waitResponse(10000L) != 1) {
+    DBG(" +SGPIO=1  false ");
+  }
   http_client.connect(FIREBASE_HOST, SSL_PORT);
   http_client.connectionKeepAlive();
   url = "";
   url += PathPrimary + ".json";
   url += "?auth=" + FIREBASE_AUTH;
+  modem.enableGPS();
   ReadFromFirebase();
 }
 
 void GPS_Telcel::PostToFirebase(const char* method, const String & data) {
+  libNFC.READ_NFC();
   Serial.println("post : " + data);
   String contentType = "application/json";
   http_client.patch(url, contentType, data);
+  libNFC.READ_NFC();
 }
 
 void GPS_Telcel::ReadFromFirebase() {
+  libNFC.READ_NFC();
   String response;
   String gpsStatus = "0";
   String AperturaStatus = "0";
   String IgnicionStatusOn = "0";
   String IgnicionStatusOff = "0";
   http_client.get(url);
+  libNFC.READ_NFC();
   response = http_client.responseBody();
-  Serial.println(response);
+  Serial.println("Esta es la respuesta de Firebase: " + response);
   if (response.length() == 0) {
     return;
   }
@@ -197,6 +211,7 @@ void GPS_Telcel::ReadFromFirebase() {
     ActualState = "{";
     ActualState += "\"Estado Actual apertura\":" + String(0) + "";
     ActualState += "}";
+    libNFC.READ_NFC();
     PostToFirebase("PATCH", ActualState);
   }
   i = 0;

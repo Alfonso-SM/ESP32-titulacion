@@ -10,7 +10,7 @@ NFC nfcLib;
 
 /*Timer cada un minuto para poder checar la base de datos*/
 hw_timer_t * timer = NULL;
-#define OneMin 40000000
+#define OneMin 10000000
 void IRAM_ATTR FirabseCheckGPS(void);
 void IRAM_ATTR ChecarBotonInterrupcion(void);
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
@@ -33,10 +33,11 @@ void loop()
   if(nfcLib.READ_NFC()){
    state.OpenDoors();
    // timerAlarmDisable(timer);
-    telcel.gpsPost();
+   // telcel.gpsPost();
     interrupcionBoton = 0;
   }
   if (interruptCounter > 0) {
+    nfcLib.READ_NFC();
     portENTER_CRITICAL(&timerMux);
     interruptCounter = 0;
     interrupcionBoton = 0;
@@ -44,9 +45,7 @@ void loop()
     telcel.ReadFromFirebase();
   }
   if (interrupcionBoton == 1) {
-    if(state.ChecarBoton()){
-      telcel.gpsPost();
-    }
+    state.ChecarBoton();
   }
   telcel.CheckState();
   
@@ -71,6 +70,7 @@ void IRAM_ATTR FirabseCheckGPS() {
 
 void IRAM_ATTR ChecarBotonInterrupcion() {
   interrupcionBoton++;
+  Serial.println("Interrupcion por boton : " + interrupcionBoton);
   if (interrupcionBoton > 1) {
     interrupcionBoton = 0;
   }

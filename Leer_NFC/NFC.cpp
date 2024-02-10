@@ -20,6 +20,7 @@ void NFC::init() {
     nfc.begin();
     versiondata = nfc.getFirmwareVersion();
   }
+  
   nfc.SAMConfig();
 }
 

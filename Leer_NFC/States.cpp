@@ -33,6 +33,7 @@ void States::OpenDoors() {
   digitalWrite(Unlock, HIGH);
   StatusOpen = true;
   DoorOpen = true;
+  autorizado = true;
 }
 
 void States::CloseDoors() {
@@ -54,19 +55,12 @@ void States::CloseDoors() {
 
 bool States::ChecarBoton() {
  // interrupcionBoton = 0;
-  if (autorizado ) {
+  if (autorizado) {
     if (!StartStatus) {
       if (RunStatus) {
-        digitalWrite(Acc1, HIGH);
-        digitalWrite(Starter, LOW);
-        delay(500);
-        digitalWrite(Starter, HIGH);
-        digitalWrite(Acc1, LOW);
-        StartStatus = true;
-        delay(1500);
+        TurnOnCar();
         return true;
-        //timerAlarmDisable(timer);  // deshabilitamos la interrupcion para leer firebase ya que se puede llegar a tardar mas de un minuto esta funcion
-      } else {
+        } else {
         if (StatusOpen) {
           digitalWrite(Run, LOW);
           digitalWrite(Acc2, LOW);
@@ -86,7 +80,7 @@ bool States::ChecarBoton() {
 void States::TurnOnCar() {
   autorizado = true;
   Chip.write(ChipAuth);
-  delay(200);
+  delay(600);
   digitalWrite(Run, LOW);
   digitalWrite(Acc2, LOW);
   RunStatus = true;
