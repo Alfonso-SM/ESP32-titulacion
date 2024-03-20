@@ -20,8 +20,8 @@ long interval = 10000;
 int counter, lastIndex, numberOfPieces = 24;
 String pieces[24], input, url;
 bool StatusOfGPS= false;
-float lat;
-float lon;
+float lat,latSave;
+float lon,lotSave;
 
 TinyGsm        modem(SerialAT);
 TinyGsmClientSecure gsm_client_secure_modem(modem);
@@ -47,10 +47,12 @@ void  GPS_Telcel::gpsPost() {
 }
 
 void GPS_Telcel::CheckState(){
-  if(modem.getGPS(&lat, &lon) && StatusOfGPS){
+  if(modem.getGPS(&lat, &lon) && StatusOfGPS && lat != latSave && lon != lotSave ) {
     Serial.println("Latitud : ");
     Serial.println(lat);
     SendGPS(lat, lon);
+    latSave = lat;
+    lonSave = lon;
     lat= NULL;
     lon = NULL;
   }
@@ -191,6 +193,7 @@ void GPS_Telcel::ReadFromFirebase() {
   if (response.length() == 0) {
     return;
   }
+  libNFC.READ_NFC();
   int i = response.lastIndexOf("GPS");
   gpsStatus = response.substring(i + 6, i + 7);
   if (gpsStatus == "1") {
@@ -204,7 +207,9 @@ void GPS_Telcel::ReadFromFirebase() {
     ActualState = "{";
     ActualState += "\"Estado Actual apertura\":" + String(0) + "";
     ActualState += "}";
+    libNFC.READ_NFC();
     PostToFirebase("PATCH", ActualState);
+    libNFC.READ_NFC();
   } else if (response.substring(i + 25, i + 31) == "Cerrar") {
     ChangeState.CloseDoors();
     String ActualState = "";
@@ -213,6 +218,7 @@ void GPS_Telcel::ReadFromFirebase() {
     ActualState += "}";
     libNFC.READ_NFC();
     PostToFirebase("PATCH", ActualState);
+    libNFC.READ_NFC();
   }
   i = 0;
   i = response.lastIndexOf("Estado Actual Motor");
@@ -224,14 +230,18 @@ void GPS_Telcel::ReadFromFirebase() {
     ActualState = "{";
     ActualState += "\"Estado Actual Motor\":" + String(0) + "";
     ActualState += "}";
+    libNFC.READ_NFC();
     PostToFirebase("PATCH", ActualState);
+    libNFC.READ_NFC();
   } else if (IgnicionStatusOff == "Apagar") {
     ChangeState.CloseDoors();
     String ActualState = "";
     ActualState = "{";
     ActualState += "\"Estado Actual Motor\":" + String(0) + "";
     ActualState += "}";
+    libNFC.READ_NFC();
     PostToFirebase("PATCH", ActualState);
+    libNFC.READ_NFC();
   }
   i = response.lastIndexOf("nfcCard");
   int j = response.lastIndexOf("},");
