@@ -28,7 +28,7 @@ public:
   void setConnection();
   void ReadFromFirebase();
   void PostToFirebase(const char* method, const String & data);
-  void CheckState();
+  void CheckGPS();
 
 private:
   void modemPowerOn();

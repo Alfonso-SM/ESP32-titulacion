@@ -38,15 +38,7 @@ void GPS_Telcel::doSomething() {
 }
 
 
-void  GPS_Telcel::gpsPost() {
-  if(!StatusOfGPS){
-    Serial.println("Se Pidio el GPS");
-    //modem.sendAT("+SGPIO=0,4,1,1");
-    StatusOfGPS = true ;
-  }
-}
-
-void GPS_Telcel::CheckState(){
+void GPS_Telcel::CheckGPS(){
   if(modem.getGPS(&lat, &lon) && StatusOfGPS && lat != latSave && lon != lotSave ) {
     Serial.println("Latitud : ");
     Serial.println(lat);
